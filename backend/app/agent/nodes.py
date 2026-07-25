@@ -1,4 +1,3 @@
-
 import pandas as pd
 import json
 from langchain_groq import ChatGroq
@@ -7,12 +6,13 @@ from app.agent.tools.segmentation_tool import run_segmentation
 from app.agent.tools.eda_tool import run_eda
 from app.core.config import settings
 
- 
-llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
-
+llm = ChatGroq(
+    model="llama-3.1-8b-instant", 
+    temperature=0,
+    api_key=settings.GROQ_API_KEY
+)
 
 def intent_extraction_node(state: AgentState) -> AgentState:
-    """Uses LLM Structured Output to extract intent, features, filters, and ambiguity."""
     structured_llm = llm.with_structured_output(ExtractedIntent)
     
     prompt = f"""
@@ -20,15 +20,18 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     Analyze the following user query regarding bank customer data:
     "{state['raw_query']}"
     
+    CRITICAL INSTRUCTIONS: 
+    Your tool call must use strictly valid JSON syntax. When generating boolean values, you MUST use lowercase 'true' or 'false'. Do not use Python's 'True' or 'False'.
+    
     Extract:
     1. Intent type ('segmentation', 'eda', 'explainability', 'conversion_analysis', or 'ambiguous')
     2. Relevant features/columns needed (Available columns: age, monthly_income, avg_monthly_balance, transaction_frequency, avg_transaction_amount)
     3. Target segments or filters mentioned.
-    4. Flag 'is_ambiguous' as True ONLY if the request is too vague to execute (e.g., "Group my data" without specifying attributes).
+    4. Flag 'is_ambiguous' as true ONLY if the request is too vague to execute.
     """
     
     result: ExtractedIntent = structured_llm.invoke(prompt)
-     
+      
     if state.get("human_clarification"):
         result.is_ambiguous = False
     
@@ -38,14 +41,12 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     
     return state
 
- 
 def data_prep_node(state: AgentState) -> AgentState:
-    """Loads CSV dataset and filters/scales columns dynamically based on Node 1 intent."""
     df = pd.read_csv(settings.DATASET_PATH)
     intent = state["intent_data"]
-     
+      
     selected_features = intent.get("features_requested") or ["avg_monthly_balance", "transaction_frequency"]
-     
+      
     valid_features = [f for f in selected_features if f in df.columns]
     if not valid_features:
         valid_features = ["avg_monthly_balance", "transaction_frequency"]
@@ -56,9 +57,7 @@ def data_prep_node(state: AgentState) -> AgentState:
     }
     return state
 
- 
 def execution_engine_node(state: AgentState) -> AgentState:
-    """Executes clustering, EDA, or conversion targeting based on intent."""
     df = pd.read_csv(settings.DATASET_PATH)
     intent_type = state["intent_data"]["intent_type"]
     features = state["prepared_data"]["features"]
@@ -81,9 +80,7 @@ def execution_engine_node(state: AgentState) -> AgentState:
     state["execution_results"] = results
     return state
 
- 
 def persona_explainability_node(state: AgentState) -> AgentState:
-    """Uses LLM to interpret mathematical outputs into human-understandable personas and rules."""
     intent_type = state["intent_data"]["intent_type"]
     results = state["execution_results"]
     
@@ -96,7 +93,7 @@ def persona_explainability_node(state: AgentState) -> AgentState:
     
     Task:
     1. Explain WHY customers were grouped or flagged in plain business English.
-    2. Define clear personas (e.g., "High-Value Wealthy Savers", "Active Transactors").
+    2. Define clear personas.
     3. Recommend specific cross-selling or retention strategies for each group.
     """
     
@@ -106,9 +103,7 @@ def persona_explainability_node(state: AgentState) -> AgentState:
     }
     return state
 
- 
 def response_synthesis_node(state: AgentState) -> AgentState:
-    """Compiles the final structured JSON response payload for the React frontend."""
     state["final_output"] = {
         "query": state["raw_query"],
         "agent_reasoning": {

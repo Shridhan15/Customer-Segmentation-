@@ -8,3 +8,4 @@ faker
 langgraph
 langchain
 langchain-groq   
+langgraph-checkpoint-sqlite
