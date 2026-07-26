@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uuid
+import logging
 
 from app.agent.graph import agent_graph
 
+
+logger = logging.getLogger("main")
 app = FastAPI(
     title="Customer Segmentation & Personalization Agent API",
     description="Backend API for the Retail Banking AI Agent",
@@ -73,12 +76,14 @@ def chat_with_agent(request: ChatRequest):
 
         final_output = result_state.get("final_output", {})
 
+        logger.info(f"Final output for thread {thread_id}: {final_output}")
+
         return ChatResponse(
             thread_id=thread_id,
             needs_human_input=False,
             # Pull the response_message out of the root state here:
             response_message=result_state.get("response_message"),
-            agent_reasoning=final_output.get("agent_reasoning"),
+            agent_reasoning=final_output.get("agent_reasoning",{}),
             insights=final_output.get("insights"),
             data_payload=final_output.get("data_payload")
         )

@@ -2,9 +2,14 @@ import pandas as pd
 import json
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+import logging
+
+logger = logging.getLogger("recommendation_tool")
+
 
 def run_product_recommendation(df: pd.DataFrame, features: list) -> dict:
     df_clean = df.dropna(subset=features).copy()
+    logger.info(f"Running product recommendation on {len(df_clean)} records with features: {features}")
     
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df_clean[features])
@@ -21,8 +26,7 @@ def run_product_recommendation(df: pd.DataFrame, features: list) -> dict:
     clean_sample = json.loads(sample_json)
     
     return {
-        "n_clusters": 4,
-        "silhouette_score": 0.85, 
+        "n_clusters": 4, 
         "cluster_centers": cluster_centers,
         "segment_counts": segment_counts,
         "data_sample": clean_sample

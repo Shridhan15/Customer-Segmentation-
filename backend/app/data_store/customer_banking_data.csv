@@ -1,5 +1,6 @@
 customer_id,customer_name,age,monthly_income,avg_monthly_balance,transaction_frequency,avg_transaction_amount,account_type,credit_score,has_credit_card,has_personal_loan
 CUST_1001,Allison Hill,63,10541.42,75579.23,12,1064.31,Checking,693,True,True
+CUST_1001,Random Hill,30,9541.42,65579.23,10,1004.31,Checking,653,True,False
 CUST_1002,Noah Rhodes,49,11628.8,89641.0,19,472.84,Checking,833,False,False
 CUST_1003,Angie Henderson,42,7423.02,56038.31,13,724.83,Savings,761,False,False
 CUST_1004,Daniel Wagner,55,7249.05,56850.72,8,1428.12,Savings,629,False,False

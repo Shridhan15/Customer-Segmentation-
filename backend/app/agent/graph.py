@@ -11,9 +11,10 @@ from app.agent.nodes import (
     response_synthesis_node,
     churn_prep_node,
     churn_execution_node,
-    product_recommendation_node,
+    
     general_conversation_node
 )
+from app.agent.product_recommendation_node import product_recommendation_node
 import logging
 
 logger = logging.getLogger("agent_router")

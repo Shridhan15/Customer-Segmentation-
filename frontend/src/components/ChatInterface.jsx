@@ -58,7 +58,8 @@ export default function ChatInterface({ onResponseReceived }) {
         setPendingClarification(false);
 
         // 2. Only pass the response to the dashboard if a data payload exists
-        if (response.final_output && response.final_output.data_payload) {
+        if (response.data_payload) {
+          console.log("Sending to Dashboard:", response.data_payload);
           onResponseReceived(response);
         }
       }

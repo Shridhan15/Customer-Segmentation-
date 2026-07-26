@@ -24,7 +24,7 @@ export default function Home() {
           </div>
         </div>
       </header>
-      
+
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-[400px] bg-white border-r border-slate-200 shadow-sm flex flex-col z-10 shrink-0">
           <div className="p-5 border-b border-slate-100 flex items-center gap-2 text-slate-800 font-semibold">
@@ -32,10 +32,15 @@ export default function Home() {
             Query Console
           </div>
           <div className="flex-1 overflow-hidden">
-            <ChatInterface onResponseReceived={setAgentResponse} />
+            <ChatInterface
+              onResponseReceived={(response) => {
+                console.log("Home received:", response);
+                setAgentResponse(response);
+              }}
+            />
           </div>
         </aside>
-        
+
         <main className="flex-1 overflow-y-auto bg-slate-50/50 p-8">
           <DashboardView data={agentResponse} />
         </main>

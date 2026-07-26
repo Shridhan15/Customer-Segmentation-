@@ -1,7 +1,6 @@
-
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
-export const sendChatQuery = async (query, threadId = null, clarification = null) => { 
+export const sendChatQuery = async (query, threadId = null, clarification = null) => {
     const payload = {
         query: query,
         thread_id: threadId,
@@ -16,15 +15,19 @@ export const sendChatQuery = async (query, threadId = null, clarification = null
             },
             body: JSON.stringify(payload),
         });
- 
+
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Server Error: ${response.status} ${response.statusText}`);
         }
-
-        return await response.json();
+ 
+        const data = await response.json();
+ 
+        console.log("Full API Response Data:", data);
+ 
+        return data;
     } catch (error) {
         console.error("API Error in sendChatQuery:", error);
-        throw error;  
+        throw error;
     }
 };

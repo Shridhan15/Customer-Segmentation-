@@ -148,26 +148,56 @@ def persona_explainability_node(state: AgentState) -> AgentState:
     return state
 
 def response_synthesis_node(state: AgentState) -> AgentState:
-    #  Extract the intent for a dynamic chat message
+
     intent = state["intent_data"]["intent_type"]
-    formatted_intent = intent.replace('_', ' ')
-    
-    # Assign the response message directly to the root state for the Chat UI
-    state["response_message"] = f"I have successfully completed the {formatted_intent} analysis. The dashboard has been updated with the latest insights."
-    
-    # Preserve your exact existing final_output for the dashboard charts
+    formatted_intent = intent.replace("_", " ").title()
+
+    state["response_message"] = (
+        f"{formatted_intent} completed successfully. "
+        "The dashboard has been updated with the latest insights."
+    )
+
+    explanation = ""
+
+    if state.get("persona_explanations"):
+        explanation = state["persona_explanations"].get(
+            "explanation_markdown",
+            ""
+        )
+
     state["final_output"] = {
+
         "query": state["raw_query"],
+
         "agent_reasoning": {
-            "detected_intent": state["intent_data"]["intent_type"],
-            "features_used": state["prepared_data"]["features"],
-            "evaluation_metrics": state["execution_results"].get("silhouette_score", "N/A")
+
+            "detected_intent":
+                intent,
+
+            "features_used":
+                (
+                    state.get("prepared_data", {})
+                    .get("features", [])
+                ),
+
+            "evaluation_metrics":
+                (
+                    state.get("execution_results", {})
+                    .get("silhouette_score", "N/A")
+                )
+
         },
-        "insights": state["persona_explanations"]["explanation_markdown"],
-        "data_payload": state["execution_results"]
+
+        "insights":
+            explanation,
+
+        "data_payload":
+            state.get("execution_results", {})
+
     }
-    logger.info(f"Response message set for Chat UI: {state['response_message']}")
-    
+
+    logger.info("Response synthesis completed.")
+
     return state
 
 def churn_prep_node(state: AgentState) -> AgentState:
@@ -209,37 +239,4 @@ def churn_execution_node(state: AgentState) -> AgentState:
     }
     return state
 
-def product_recommendation_node(state: AgentState) -> AgentState:
-    df = pd.read_csv(settings.DATASET_PATH)
-    intent = state["intent_data"]
-    selected_features = intent.get("features_requested") or ["avg_monthly_balance", "transaction_frequency"]
-    valid_features = [f for f in selected_features if f in df.columns]
-    if not valid_features:
-        valid_features = ["avg_monthly_balance", "transaction_frequency"]
-        
-    state["prepared_data"] = {
-        "features": valid_features,
-        "record_count": len(df)
-    }
-    
-    results = run_product_recommendation(df, valid_features)
-    state["execution_results"] = results
-    
-    prompt = f"""
-    You are an expert Bank Customer Analytics Strategist.
-    Analyze the product recommendation execution results of the following query: "{state['raw_query']}"
-    
-    Execution Results Data:
-    {json.dumps(results, indent=2, default=str)}
-    
-    Task:
-    1. Explain WHY customers were matched with specific products in plain business English.
-    2. Define the distinct customer profiles.
-    3. Recommend specific cross-selling campaign strategies for each group.
-    """
-    response = llm.invoke(prompt)
-    
-    state["persona_explanations"] = {
-        "explanation_markdown": response.content
-    }
-    return state
+ 
