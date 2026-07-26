@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class ExtractedIntent(BaseModel):
     intent_type: str = Field(
-        description="Type of task: 'segmentation', 'eda', 'explainability', 'conversion_analysis', or 'ambiguous'"
+        description="Type of task: 'segmentation', 'eda', 'explainability', 'conversion_analysis', 'chit_chat', or 'ambiguous'"
     )
     features_requested: List[str] = Field(
         default_factory=list, 
@@ -36,4 +36,5 @@ class AgentState(TypedDict):
     prepared_data: Optional[Dict[str, Any]]
     execution_results: Optional[Dict[str, Any]]
     persona_explanations: Optional[Dict[str, Any]]
+    response_message: Optional[str]
     final_output: Optional[Dict[str, Any]]

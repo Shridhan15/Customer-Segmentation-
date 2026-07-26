@@ -20,3 +20,5 @@ dist/
 *.log
 
 __pycache__/
+sqlite_state.db-shm
+sqlite_state.db-wal

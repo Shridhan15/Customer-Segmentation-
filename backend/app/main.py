@@ -36,6 +36,7 @@ class ChatResponse(BaseModel):
     thread_id: str
     needs_human_input: bool
     clarification_question: Optional[str] = None
+    response_message: Optional[str] = None
     agent_reasoning: Optional[Dict[str, Any]] = None
     insights: Optional[str] = None
     data_payload: Optional[Dict[str, Any]] = None
@@ -75,6 +76,8 @@ def chat_with_agent(request: ChatRequest):
         return ChatResponse(
             thread_id=thread_id,
             needs_human_input=False,
+            # Pull the response_message out of the root state here:
+            response_message=result_state.get("response_message"),
             agent_reasoning=final_output.get("agent_reasoning"),
             insights=final_output.get("insights"),
             data_payload=final_output.get("data_payload")

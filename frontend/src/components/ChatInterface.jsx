@@ -7,7 +7,7 @@ const SUGGESTED_PROMPTS = [
   "Recommend Products",
   "High Value Customers",
   "Loyal Customers",
-  "Predict Churn"
+  "Predict Churn",
 ];
 
 export default function ChatInterface({ onResponseReceived }) {
@@ -31,7 +31,7 @@ export default function ChatInterface({ onResponseReceived }) {
       const response = await sendChatQuery(
         payloadQuery,
         currentThread,
-        clarification
+        clarification,
       );
 
       setCurrentThread(response.thread_id);
@@ -43,15 +43,24 @@ export default function ChatInterface({ onResponseReceived }) {
         ]);
         setPendingClarification(true);
       } else {
+        // 1. Extract the dynamic response message from the agent state
+        const displayMessage =
+          response.response_message || "Processing complete.";
+
         setChatHistory((prev) => [
           ...prev,
           {
             role: "system",
-            content: "Query executed successfully. Dashboard updated.",
+            content: displayMessage,
           },
         ]);
+
         setPendingClarification(false);
-        onResponseReceived(response);
+
+        // 2. Only pass the response to the dashboard if a data payload exists
+        if (response.final_output && response.final_output.data_payload) {
+          onResponseReceived(response);
+        }
       }
     } catch (error) {
       setChatHistory((prev) => [
@@ -108,7 +117,7 @@ export default function ChatInterface({ onResponseReceived }) {
             </button>
           ))}
         </div>
-        
+
         <div className="flex items-center gap-2 bg-white border-2 border-slate-200 rounded-xl p-1.5 shadow-sm focus-within:border-indigo-500 transition-all">
           <input
             type="text"

@@ -7,6 +7,14 @@ from app.agent.tools.eda_tool import run_eda
 from app.agent.tools.churn_tool import run_churn_prediction
 from app.agent.tools.recommendation_tool import run_product_recommendation
 from app.core.config import settings
+import logging
+ 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - [%(levelname)s] - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("agent_nodes")
 
 llm = ChatGroq(
     model="llama-3.1-8b-instant", 
@@ -18,8 +26,10 @@ def human_hitl_node(state: AgentState) -> AgentState:
     return state
 
 def intent_extraction_node(state: AgentState) -> AgentState:
-    structured_llm = llm.with_structured_output(ExtractedIntent)
+    logger.info(f"--- Entering INTENT EXTRACTION NODE ---")
+    logger.debug(f"Raw query: {state['raw_query']}")
     
+    structured_llm = llm.with_structured_output(ExtractedIntent)
     prompt = f"""
     You are an expert banking analytics AI assistant. 
     Analyze the following user query regarding bank customer data:
@@ -27,7 +37,7 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     
     CRITICAL INSTRUCTIONS: 
     Your tool call must use strictly valid JSON syntax. When generating boolean values, you MUST use lowercase 'true' or 'false'. Do not use Python's 'True' or 'False'.
-    
+    If the user is simply greeting you, saying goodbye, or making general conversation (e.g., "hi", "how are you", "thanks")(basically not related to analyis, report etc), set intent_type to 'chit_chat'.
     Extract:
     1. Intent type ('segmentation', 'predict_churn', 'recommend_products', 'eda', 'explainability', 'conversion_analysis', or 'ambiguous')
     2. Relevant features/columns needed (Available columns: age, monthly_income, avg_monthly_balance, transaction_frequency, avg_transaction_amount)
@@ -45,20 +55,50 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     state["human_clarification"] = result.clarification_question if result.is_ambiguous else None
     
     return state
+
+def general_conversation_node(state: AgentState) -> AgentState:
+    logger.info(f"--- Entering GENERAL CONVERSATION NODE ---")
+    query = state["raw_query"]
+
+    prompt = f"""
+    You are an expert banking analytics AI assistant. 
+    The user sent this conversational message: "{query}"
+    
+    Respond politely, concisely, and naturally. 
+    - If they are saying goodbye (e.g., "bye", "see you"), wish them well and say goodbye without asking how to help them further.
+    - If they are greeting you or saying thanks, respond warmly and briefly offer your assistance with banking data.
+    """
+    
+    response = llm.invoke(prompt)
+    state["response_message"] = response.content
+    
+    state["final_output"] = {
+        "data_payload": None 
+    }
+    logger.info(f"General conversation response generated: {state['response_message']}")
+    return state
+
+
 def data_prep_node(state: AgentState) -> AgentState:
+    logger.info(f"--- Entering DATA PREP NODE ---")
+    logger.info(f"Loading dataset from {settings.DATASET_PATH}")
     df = pd.read_csv(settings.DATASET_PATH)
     intent = state["intent_data"]
       
     selected_features = intent.get("features_requested") or ["avg_monthly_balance", "transaction_frequency"]
-      
+    logger.info(f"Features requested by intent: {selected_features}")
+
+
     valid_features = [f for f in selected_features if f in df.columns]
     if not valid_features:
+        logger.warning("No valid features found from request. Falling back to default features.")
         valid_features = ["avg_monthly_balance", "transaction_frequency"]
         
     state["prepared_data"] = {
         "features": valid_features,
         "record_count": len(df)
     }
+    logger.info(f"Prepared data with {len(valid_features)} features and {len(df)} records.")
     return state
 
 def execution_engine_node(state: AgentState) -> AgentState:
@@ -108,6 +148,14 @@ def persona_explainability_node(state: AgentState) -> AgentState:
     return state
 
 def response_synthesis_node(state: AgentState) -> AgentState:
+    #  Extract the intent for a dynamic chat message
+    intent = state["intent_data"]["intent_type"]
+    formatted_intent = intent.replace('_', ' ')
+    
+    # Assign the response message directly to the root state for the Chat UI
+    state["response_message"] = f"I have successfully completed the {formatted_intent} analysis. The dashboard has been updated with the latest insights."
+    
+    # Preserve your exact existing final_output for the dashboard charts
     state["final_output"] = {
         "query": state["raw_query"],
         "agent_reasoning": {
@@ -118,6 +166,8 @@ def response_synthesis_node(state: AgentState) -> AgentState:
         "insights": state["persona_explanations"]["explanation_markdown"],
         "data_payload": state["execution_results"]
     }
+    logger.info(f"Response message set for Chat UI: {state['response_message']}")
+    
     return state
 
 def churn_prep_node(state: AgentState) -> AgentState:
