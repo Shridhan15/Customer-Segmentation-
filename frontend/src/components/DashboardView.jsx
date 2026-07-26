@@ -17,7 +17,6 @@ import {
   Users, 
   Layers, 
   Target, 
-  BadgePoundSterling, 
   Award, 
   CheckCircle2,
   TrendingUp,
@@ -104,34 +103,54 @@ const extractAIStrategy = (rawInsights, segmentId, features, centerData) => {
 const formatAIText = (text) => {
   if (!text) return null;
   const lines = text.split('\n');
+
   return lines.map((line, idx) => {
-    const tLine = line.trim();
-    if (!tLine) return <div key={idx} className="h-1.5" />; 
-    
+    let tLine = line.trim();
+    if (!tLine) return <div key={idx} className="h-2" />;
+
+    if (tLine.match(/^={3,}$/) || tLine.match(/^-{3,}$/)) {
+        return <div key={idx} className="h-px bg-slate-200 my-5" />;
+    }
+
     const formatBold = (str) => {
         const parts = str.split(/(\*\*.*?\*\*)/);
         return parts.map((part, i) => {
             if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={i} className="text-slate-900 font-bold">{part.slice(2, -2)}</strong>;
+                return <strong key={i} className="text-slate-900 font-extrabold">{part.slice(2, -2)}</strong>;
             }
             return part;
         });
     };
 
-    if (tLine.startsWith('*') || tLine.startsWith('-')) {
+    if (tLine.match(/^#{1,3}\s/)) {
+       const cleanHeader = tLine.replace(/^#{1,3}\s/, '');
+       return (
+         <h3 key={idx} className="font-extrabold text-indigo-900 text-[16px] mt-8 mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-indigo-50 pb-2">
+           <Sparkles size={18} className="text-indigo-500" /> 
+           {formatBold(cleanHeader)}
+         </h3>
+       );
+    }
+
+    if (tLine.startsWith('**') && tLine.endsWith('**') && tLine.length > 4) {
+       return <h4 key={idx} className="font-bold text-slate-900 text-[15px] mt-6 mb-3">{tLine.slice(2, -2)}</h4>;
+    }
+
+    if (tLine.match(/^[0-9]+\.\s/)) {
+       return <h4 key={idx} className="font-bold text-slate-900 text-[14px] mt-5 mb-2">{formatBold(tLine)}</h4>;
+    }
+
+    if (tLine.match(/^[\*\-\+]\s/)) {
+      const cleanBullet = tLine.replace(/^[\*\-\+]\s+/, '');
       return (
         <div key={idx} className="flex items-start gap-3 my-2 ml-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0 shadow-sm" />
-          <p className="text-[13.5px] text-slate-700 leading-relaxed flex-1">{formatBold(tLine.replace(/^[\*\-\s]+/, ''))}</p>
+          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0 shadow-sm opacity-80" />
+          <p className="text-[13.5px] text-slate-700 leading-relaxed flex-1">{formatBold(cleanBullet)}</p>
         </div>
       );
-    } else if (tLine.match(/^[0-9]+\./)) {
-       return <h4 key={idx} className="font-bold text-slate-900 text-[14px] mt-6 mb-2">{formatBold(tLine)}</h4>;
-    } else if (tLine.toLowerCase().includes('recommendations') || tLine.toLowerCase().includes('insights') || tLine.toLowerCase().includes('strategies')) {
-       return <h3 key={idx} className="font-extrabold text-indigo-900 text-[16px] mt-8 mb-4 uppercase tracking-wider flex items-center gap-2 border-b border-indigo-100 pb-2"><Sparkles size={18}/> {formatBold(tLine)}</h3>;
-    } else {
-      return <p key={idx} className="text-[14px] text-slate-700 leading-relaxed mb-3 font-medium">{formatBold(tLine)}</p>;
     }
+
+    return <p key={idx} className="text-[14px] text-slate-700 leading-relaxed mb-3 font-medium">{formatBold(tLine)}</p>;
   });
 };
 
@@ -253,11 +272,9 @@ export default function DashboardView({ data }) {
 
   return (
     <div className="space-y-8 pb-12 max-w-[1600px] mx-auto">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KPICard title="Total Customers" value={parsedData.totalCustomers > 0 ? parsedData.totalCustomers.toLocaleString() : "Unknown"} subtitle="Analyzed in dataset" Icon={Users} colorClass="bg-blue-50 text-blue-600" />
         <KPICard title="Active Segments" value={parsedData.numClusters} subtitle="Identified clusters" Icon={Layers} colorClass="bg-purple-50 text-purple-600" />
-        <KPICard title="Rec. Accuracy" value="94.2%" subtitle="Historical conversion" Icon={Target} colorClass="bg-emerald-50 text-emerald-600" />
-        <KPICard title="Average Spend" value="£840" subtitle="Per user annually" Icon={BadgePoundSterling} colorClass="bg-amber-50 text-amber-600" />
         <KPICard title="Best Segment" value={parsedData.bestSegmentName} subtitle="Highest LTV potential" Icon={Award} colorClass="bg-pink-50 text-pink-600" />
         <KPICard title="Confidence Score" value={parsedData.evalMetrics !== "N/A" ? Number(parsedData.evalMetrics).toFixed(2) : "High"} subtitle="Silhouette metric" Icon={CheckCircle2} colorClass="bg-indigo-50 text-indigo-600" />
       </div>
@@ -416,15 +433,6 @@ export default function DashboardView({ data }) {
 
       {parsedData.rawInsights && (
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 mt-8">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-            <div className="bg-indigo-100 text-indigo-700 p-3 rounded-xl">
-              <Sparkles size={24} />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800">Executive Analytics Report</h2>
-              <p className="text-[13px] font-semibold text-slate-500">Groq generated intelligence</p>
-            </div>
-          </div>
           <div className="px-2">
             {formatAIText(parsedData.rawInsights)}
           </div>

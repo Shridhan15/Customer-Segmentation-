@@ -43,7 +43,6 @@ export default function ChatInterface({ onResponseReceived }) {
         ]);
         setPendingClarification(true);
       } else {
-        // 1. Extract the dynamic response message from the agent state
         const displayMessage =
           response.response_message || "Processing complete.";
 
@@ -57,7 +56,6 @@ export default function ChatInterface({ onResponseReceived }) {
 
         setPendingClarification(false);
 
-        // 2. Only pass the response to the dashboard if a data payload exists
         if (response.data_payload) {
           console.log("Sending to Dashboard:", response.data_payload);
           onResponseReceived(response);

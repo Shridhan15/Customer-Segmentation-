@@ -30,6 +30,7 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     logger.debug(f"Raw query: {state['raw_query']}")
     
     structured_llm = llm.with_structured_output(ExtractedIntent)
+    
     prompt = f"""
     You are an expert banking analytics AI assistant. 
     Analyze the following user query regarding bank customer data:
@@ -38,6 +39,8 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     CRITICAL INSTRUCTIONS: 
     Your tool call must use strictly valid JSON syntax. When generating boolean values, you MUST use lowercase 'true' or 'false'. Do not use Python's 'True' or 'False'.
     If the user is simply greeting you, saying goodbye, or making general conversation (e.g., "hi", "how are you", "thanks")(basically not related to analyis, report etc), set intent_type to 'chit_chat'.
+    If the user asks to find, analyze, or identify specific groups like "High Value Customers" or "Loyal Customers", you MUST set intent_type to 'segmentation'.
+    
     Extract:
     1. Intent type ('segmentation', 'predict_churn', 'recommend_products', 'eda', 'explainability', 'conversion_analysis', or 'ambiguous')
     2. Relevant features/columns needed (Available columns: age, monthly_income, avg_monthly_balance, transaction_frequency, avg_transaction_amount)
@@ -228,9 +231,11 @@ def churn_execution_node(state: AgentState) -> AgentState:
     {json.dumps(results, indent=2, default=str)}
     
     Task:
-    1. Explain the primary factors driving churn risk in plain business English.
-    2. Define the risk groups clearly.
+    1. Look at the 'churn_risk' metric inside the cluster_centers data. Explain the primary factors driving this risk in plain business English.
+    2. Define the risk groups clearly, explicitly stating their average churn probability.
     3. Recommend specific retention strategies for the high-risk group.
+    
+    Use Markdown formatting. Do not use placeholders.
     """
     response = llm.invoke(prompt)
     
@@ -238,5 +243,4 @@ def churn_execution_node(state: AgentState) -> AgentState:
         "explanation_markdown": response.content
     }
     return state
-
  

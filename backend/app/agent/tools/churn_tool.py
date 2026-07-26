@@ -6,7 +6,10 @@ from sklearn.metrics import accuracy_score
 
 def run_churn_prediction(df: pd.DataFrame, features: list, target: str = "churn") -> dict:
     if target not in df.columns:
-        df[target] = (df['avg_monthly_balance'] < df['avg_monthly_balance'].median()).astype(int)
+        balance_med = df['avg_monthly_balance'].median()
+        freq_med = df['transaction_frequency'].median()
+        df[target] = ((df['avg_monthly_balance'] < balance_med) & 
+                      (df['transaction_frequency'] < freq_med)).astype(int)
     
     df_clean = df.dropna(subset=features + [target]).copy()
     X = df_clean[features]
@@ -24,16 +27,21 @@ def run_churn_prediction(df: pd.DataFrame, features: list, target: str = "churn"
 
     segment_counts = {int(k): int(v) for k, v in df_clean["segment"].value_counts().to_dict().items()}
     
-    cluster_centers_raw = df_clean.groupby("segment")[features].mean().values.tolist()
-    cluster_centers = [[float(val) for val in row] for row in cluster_centers_raw]
+    centers = []
+    for segment_id, group in df_clean.groupby("segment"):
+        center = {"segment": int(segment_id)}
+        for col in features:
+            center[col] = float(group[col].mean())
+        center["churn_risk"] = float(group["churn_risk"].mean())
+        centers.append(center)
 
     sample_json = df_clean[["customer_id"] + features + ["churn_risk", "segment"]].head(10).to_json(orient="records")
     clean_sample = json.loads(sample_json)
 
     return {
         "n_clusters": len(segment_counts),
-        "silhouette_score": round(accuracy, 4),
-        "cluster_centers": cluster_centers,
+        "silhouette_score": round(accuracy, 4), 
+        "cluster_centers": centers,
         "segment_counts": segment_counts,
         "data_sample": clean_sample
     }
