@@ -4,6 +4,8 @@ from langchain_groq import ChatGroq
 from app.agent.state import AgentState, ExtractedIntent
 from app.agent.tools.segmentation_tool import run_segmentation
 from app.agent.tools.eda_tool import run_eda
+from app.agent.tools.churn_tool import run_churn_prediction
+from app.agent.tools.recommendation_tool import run_product_recommendation
 from app.core.config import settings
 
 llm = ChatGroq(
@@ -11,6 +13,9 @@ llm = ChatGroq(
     temperature=0,
     api_key=settings.GROQ_API_KEY
 )
+
+def human_hitl_node(state: AgentState) -> AgentState:
+    return state
 
 def intent_extraction_node(state: AgentState) -> AgentState:
     structured_llm = llm.with_structured_output(ExtractedIntent)
@@ -24,7 +29,7 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     Your tool call must use strictly valid JSON syntax. When generating boolean values, you MUST use lowercase 'true' or 'false'. Do not use Python's 'True' or 'False'.
     
     Extract:
-    1. Intent type ('segmentation', 'eda', 'explainability', 'conversion_analysis', or 'ambiguous')
+    1. Intent type ('segmentation', 'predict_churn', 'recommend_products', 'eda', 'explainability', 'conversion_analysis', or 'ambiguous')
     2. Relevant features/columns needed (Available columns: age, monthly_income, avg_monthly_balance, transaction_frequency, avg_transaction_amount)
     3. Target segments or filters mentioned.
     4. Flag 'is_ambiguous' as true ONLY if the request is too vague to execute.
@@ -40,7 +45,6 @@ def intent_extraction_node(state: AgentState) -> AgentState:
     state["human_clarification"] = result.clarification_question if result.is_ambiguous else None
     
     return state
-
 def data_prep_node(state: AgentState) -> AgentState:
     df = pd.read_csv(settings.DATASET_PATH)
     intent = state["intent_data"]
@@ -113,5 +117,79 @@ def response_synthesis_node(state: AgentState) -> AgentState:
         },
         "insights": state["persona_explanations"]["explanation_markdown"],
         "data_payload": state["execution_results"]
+    }
+    return state
+
+def churn_prep_node(state: AgentState) -> AgentState:
+    df = pd.read_csv(settings.DATASET_PATH)
+    intent = state["intent_data"]
+    selected_features = intent.get("features_requested") or ["avg_monthly_balance", "transaction_frequency"]
+    valid_features = [f for f in selected_features if f in df.columns]
+    if not valid_features:
+        valid_features = ["avg_monthly_balance", "transaction_frequency"]
+    state["prepared_data"] = {
+        "features": valid_features,
+        "record_count": len(df)
+    }
+    return state
+
+def churn_execution_node(state: AgentState) -> AgentState:
+    df = pd.read_csv(settings.DATASET_PATH)
+    features = state["prepared_data"]["features"]
+    
+    results = run_churn_prediction(df, features)
+    state["execution_results"] = results
+    
+    prompt = f"""
+    You are an expert Bank Customer Analytics Strategist.
+    Analyze the churn prediction execution results of the following query: "{state['raw_query']}"
+    
+    Execution Results Data:
+    {json.dumps(results, indent=2, default=str)}
+    
+    Task:
+    1. Explain the primary factors driving churn risk in plain business English.
+    2. Define the risk groups clearly.
+    3. Recommend specific retention strategies for the high-risk group.
+    """
+    response = llm.invoke(prompt)
+    
+    state["persona_explanations"] = {
+        "explanation_markdown": response.content
+    }
+    return state
+
+def product_recommendation_node(state: AgentState) -> AgentState:
+    df = pd.read_csv(settings.DATASET_PATH)
+    intent = state["intent_data"]
+    selected_features = intent.get("features_requested") or ["avg_monthly_balance", "transaction_frequency"]
+    valid_features = [f for f in selected_features if f in df.columns]
+    if not valid_features:
+        valid_features = ["avg_monthly_balance", "transaction_frequency"]
+        
+    state["prepared_data"] = {
+        "features": valid_features,
+        "record_count": len(df)
+    }
+    
+    results = run_product_recommendation(df, valid_features)
+    state["execution_results"] = results
+    
+    prompt = f"""
+    You are an expert Bank Customer Analytics Strategist.
+    Analyze the product recommendation execution results of the following query: "{state['raw_query']}"
+    
+    Execution Results Data:
+    {json.dumps(results, indent=2, default=str)}
+    
+    Task:
+    1. Explain WHY customers were matched with specific products in plain business English.
+    2. Define the distinct customer profiles.
+    3. Recommend specific cross-selling campaign strategies for each group.
+    """
+    response = llm.invoke(prompt)
+    
+    state["persona_explanations"] = {
+        "explanation_markdown": response.content
     }
     return state

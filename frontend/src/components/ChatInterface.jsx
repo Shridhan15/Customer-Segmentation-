@@ -1,6 +1,14 @@
 import React, { useState } from "react";
+import { Send, Loader2, ChevronRight, Terminal } from "lucide-react";
 import { sendChatQuery } from "../services/api";
-import { Send, Loader2 } from "lucide-react";
+
+const SUGGESTED_PROMPTS = [
+  "Segment Customers",
+  "Recommend Products",
+  "High Value Customers",
+  "Loyal Customers",
+  "Predict Churn"
+];
 
 export default function ChatInterface({ onResponseReceived }) {
   const [query, setQuery] = useState("");
@@ -9,21 +17,21 @@ export default function ChatInterface({ onResponseReceived }) {
   const [currentThread, setCurrentThread] = useState(null);
   const [pendingClarification, setPendingClarification] = useState(null);
 
-  const handleSend = async () => {
-    if (!query.trim()) return;
+  const handleSend = async (textToSubmit = query) => {
+    if (!textToSubmit.trim()) return;
 
-    const userMessage = { role: "user", content: query };
+    const userMessage = { role: "user", content: textToSubmit };
     setChatHistory((prev) => [...prev, userMessage]);
     setLoading(true);
 
     try {
-      const payloadQuery = pendingClarification ? "" : query;
-      const clarification = pendingClarification ? query : null;
+      const payloadQuery = pendingClarification ? "" : textToSubmit;
+      const clarification = pendingClarification ? textToSubmit : null;
 
       const response = await sendChatQuery(
         payloadQuery,
         currentThread,
-        clarification,
+        clarification
       );
 
       setCurrentThread(response.thread_id);
@@ -31,24 +39,24 @@ export default function ChatInterface({ onResponseReceived }) {
       if (response.needs_human_input) {
         setChatHistory((prev) => [
           ...prev,
-          { role: "agent", content: response.clarification_question },
+          { role: "system", content: response.clarification_question },
         ]);
         setPendingClarification(true);
       } else {
         setChatHistory((prev) => [
           ...prev,
           {
-            role: "agent",
-            content: "Task complete. I have generated the insights.",
+            role: "system",
+            content: "Query executed successfully. Dashboard updated.",
           },
         ]);
         setPendingClarification(false);
-        onResponseReceived(response);  
+        onResponseReceived(response);
       }
     } catch (error) {
       setChatHistory((prev) => [
         ...prev,
-        { role: "agent", content: "Error connecting to the AI agent." },
+        { role: "system", content: "Error executing query. Check connection." },
       ]);
     }
 
@@ -58,37 +66,70 @@ export default function ChatInterface({ onResponseReceived }) {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {chatHistory.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`p-3 rounded-lg max-w-[85%] ${msg.role === "user" ? "bg-blue-100 self-end ml-auto" : "bg-gray-100 self-start"}`}
-          >
-            <p className="text-sm text-gray-800">{msg.content}</p>
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {chatHistory.length === 0 ? (
+          <div className="text-center text-slate-400 mt-10">
+            <Terminal size={32} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-medium">Ready for data queries</p>
           </div>
-        ))}
-        {loading && <Loader2 className="animate-spin text-blue-500 mx-auto" />}
+        ) : (
+          chatHistory.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`p-3 rounded-xl text-[13.5px] max-w-[90%] shadow-sm ${
+                msg.role === "user"
+                  ? "bg-slate-800 text-white self-end ml-auto"
+                  : "bg-slate-50 text-slate-700 self-start border border-slate-200"
+              }`}
+            >
+              <p className="leading-relaxed">{msg.content}</p>
+            </div>
+          ))
+        )}
+        {loading && (
+          <div className="flex justify-center p-4">
+            <Loader2 className="animate-spin text-indigo-500" size={24} />
+          </div>
+        )}
       </div>
 
-      <div className="p-4 border-t flex items-center gap-2">
-        <input
-          type="text"
-          className="flex-1 border rounded-md p-2 outline-none focus:ring-2 focus:ring-blue-400"
-          placeholder={
-            pendingClarification
-              ? "Answer the agent..."
-              : "Ask the agent to segment customers..."
-          }
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        />
-        <button
-          onClick={handleSend}
-          className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700"
-        >
-          <Send size={20} />
-        </button>
+      <div className="p-4 bg-white border-t border-slate-200 space-y-4 z-10">
+        <div className="flex flex-wrap gap-2.5">
+          {SUGGESTED_PROMPTS.map((prompt, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                setQuery(prompt);
+                handleSend(prompt);
+              }}
+              className="text-[12px] font-semibold bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-full hover:border-indigo-400 hover:text-indigo-700 transition-colors flex items-center gap-1 shadow-sm whitespace-nowrap"
+            >
+              {prompt} <ChevronRight size={12} className="opacity-70" />
+            </button>
+          ))}
+        </div>
+        
+        <div className="flex items-center gap-2 bg-white border-2 border-slate-200 rounded-xl p-1.5 shadow-sm focus-within:border-indigo-500 transition-all">
+          <input
+            type="text"
+            className="flex-1 p-2 outline-none text-[14px] text-slate-800 bg-transparent placeholder-slate-400 font-medium"
+            placeholder={
+              pendingClarification
+                ? "Provide clarification..."
+                : "Enter query parameters..."
+            }
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend(query)}
+          />
+          <button
+            onClick={() => handleSend(query)}
+            disabled={loading || !query.trim()}
+            className="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+          >
+            <Send size={18} />
+          </button>
+        </div>
       </div>
     </div>
   );
